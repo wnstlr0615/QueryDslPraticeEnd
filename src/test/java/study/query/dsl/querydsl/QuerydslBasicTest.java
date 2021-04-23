@@ -1,8 +1,14 @@
 package study.query.dsl.querydsl;
 
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.Predicate;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -11,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Description;
 import org.springframework.transaction.annotation.Transactional;
+import study.query.dsl.querydsl.dto.MemberDto;
+import study.query.dsl.querydsl.dto.QMemberDto;
 import study.query.dsl.querydsl.entity.Member;
 import study.query.dsl.querydsl.entity.QMember;
 import study.query.dsl.querydsl.entity.Team;
@@ -377,11 +385,189 @@ public class QuerydslBasicTest {
         }
     }
     @Test
-    public void () throws Exception{
+    public void  상수_문자_더하기() throws Exception{
         //given
-            
         //when
-        
+        List<Tuple> result = query.select(member.name, Expressions.constant("A"))
+                .from(member)
+                .fetch();
+
+        //then
+        for (Tuple tuple : result) {
+            System.out.println(tuple);
+        }
+    }
+    @Test
+    public void 문자더하기_concat() throws Exception{
+        //given
+        //when
+        List<String> result = query.select(member.name.concat("_")
+                .concat(member.age.stringValue()))
+                .from(member)
+                .fetch();
+        //then
+        for (String s : result) {
+            System.out.println(s);
+        }
+    }
+    @Test
+    public void DTO조회() throws Exception{
+        //given
+        //when
+        //프로퍼티 접근 방법
+        List<MemberDto> result1 = query
+                .select(Projections.bean(MemberDto.class
+                        , member.name
+                        , member.age
+                )).from(member)
+                .fetch();
+        System.out.println("프로퍼티 접근 방법");
+        for (MemberDto memberDto : result1) {
+            System.out.println(memberDto);
+        }
+
+        List<MemberDto> result2 = query.select(Projections.fields(
+                MemberDto.class
+                , member.name, member.age))
+                .from(member)
+                .fetch();
+        System.out.println("필드 직접 접근 방법");
+        for (MemberDto memberDto : result2) {
+            System.out.println(memberDto);
+        }
+        List<MemberDto> result3 = query
+                .select(Projections.fields(MemberDto.class
+                        , member.name.as("name")
+                        , member.age.as("age"))
+                ).from(member)
+                .fetch();
+
+        System.out.println("필드 직접 접근 방법(별칭이 다를 경우)");
+        for (MemberDto memberDto : result3) {
+            System.out.println(memberDto);
+        }
+
+        List<MemberDto> result4 = query
+                .select(Projections.constructor(
+                        MemberDto.class
+                        , member.name, member.age))
+                .from(member)
+                .fetch();
+        System.out.println("생성자 접근 방법");
+        for (MemberDto memberDto : result4) {
+            System.out.println(memberDto);
+        }
         //then
     }
+    @Test
+    public void QueryProjection_활용() throws Exception{
+        //given
+        //when
+        List<MemberDto> result = query.select(new QMemberDto(member.name, member.age))
+                .from(member)
+                .fetch();
+        //then
+        for (MemberDto memberDto : result) {
+            System.out.println(memberDto);
+        }
+    }
+    @Test
+    public void distinct() throws Exception{
+        //given
+        //when
+        List<String> result = query.select(member.name).distinct()
+                .from(member)
+                .fetch();
+        //then
+        for (String s : result) {
+            System.out.println(s);
+        }
+    }
+    @Test
+    public void 동정쿼리_BoolenBuilder() throws Exception{
+        //given
+        String nameParam="member1";
+        Integer ageParam=10;
+
+        //when
+        List<Member> result= searchMember1(nameParam, ageParam);
+        for (Member member : result) {
+            System.out.println(member);
+        }
+        //then
+    }
+
+    private List<Member> searchMember1(String nameParam, Integer ageParam) {
+        BooleanBuilder builder=new BooleanBuilder();
+        if(nameParam!=null)builder.and(member.name.eq(nameParam));
+        if(ageParam!=null)builder.and(member.age.eq(ageParam));
+        return query.selectFrom(member)
+                .where(builder)
+                .fetch();
+
+    }
+
+    @Test
+    public void 동적쿼리_WhereParam() throws Exception{
+        //given
+        String nameParam="member1";
+        Integer ageParam=10;
+        //when
+        List<Member> result= searchMember2(nameParam, ageParam);
+        for (Member member : result) {
+            System.out.println(member);
+        }
+        //then
+    }
+
+    private List<Member> searchMember2(String nameParam, Integer ageParam) {
+        return query.selectFrom(member)
+                .where(usernameEq(nameParam), ageEq(ageParam))
+                .fetch();
+    }
+
+    private BooleanExpression ageEq(Integer ageParam) {
+        return ageParam!=null?member.age.eq(ageParam):null;
+    }
+
+    private BooleanExpression usernameEq(String nameParam) {
+        return nameParam!=null?member.name.eq(nameParam):null;
+    }
+
+    @Test
+    public void 동적쿼리조합() throws Exception{
+        //given
+        String nameParam="member1";
+        Integer ageParam=10;
+        //when
+        List<Member> result= searchMember3(nameParam, ageParam);
+        for (Member member : result) {
+            System.out.println(member);
+        }
+        //then
+    }
+
+    private List<Member> searchMember3(String nameParam, Integer ageParam) {
+        return query.selectFrom(member)
+                .where(allEq(nameParam, ageParam))
+                .fetch();
+
+    }
+
+    private BooleanExpression allEq(String nameParam, Integer ageParam) {
+        return usernameEq(nameParam).and(ageEq(ageParam));
+    }
+    @Test
+    public void bulkUpdate() throws Exception{
+        long count1 = query.update(member)
+                .set(member.name, "비회원")
+                .where(member.age.lt(28))
+                .execute();
+        assertThat(count1).isEqualTo(2);
+        long count2 = query.update(member)
+                .set(member.age, member.age.add(1))
+                .execute();
+        assertThat(count2).isEqualTo(4);
+    }
+
 }
