@@ -14,6 +14,7 @@ import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Description;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,12 +40,13 @@ import static study.query.dsl.querydsl.entity.QTeam.team;
 public class QuerydslBasicTest {
     @PersistenceContext
     EntityManager em;
+
+    @Autowired
     JPAQueryFactory query;
     
     @BeforeEach
     public void before(){
-        query=new JPAQueryFactory(em);
-        
+
         Team teamA = createTeam("teamA");
         Team teamB = createTeam("teamB");
 
@@ -559,15 +561,63 @@ public class QuerydslBasicTest {
     }
     @Test
     public void bulkUpdate() throws Exception{
+        // 28살 이하 회원 명을 비회원으로 변경
         long count1 = query.update(member)
                 .set(member.name, "비회원")
                 .where(member.age.lt(28))
                 .execute();
         assertThat(count1).isEqualTo(2);
+
+        // 모든 회원 나이 +1
         long count2 = query.update(member)
                 .set(member.age, member.age.add(1))
                 .execute();
         assertThat(count2).isEqualTo(4);
+
+        //18살 이상 회원 데이터 삭제
+        long count3 = query.delete(member)
+                .where(member.age.gt(18))
+                .execute();
+
+
+    }
+    @Test
+    @Description("SQL Function 호출")
+    public void sqlFunction() throws Exception{
+        //given
+        //when
+        String result = query.select(Expressions.
+                stringTemplate("function('replace', {0}, {1}, {2})",
+                        member.name, "member", "M"))
+                .from(member)
+                .fetchFirst();
+        //then
+        assertThat(result).isEqualTo("M1");
+    }
+
+    //SQL 함수를 사용하여 대문자 변경
+    @Test
+    public void sqlFunctionUpper() throws Exception{
+        //given
+        //when
+        String result = query.select(Expressions
+                .stringTemplate(
+                        "function('upper', {0})", member.name))
+                .from(member)
+                .fetchFirst();
+        //then
+        assertThat(result).isEqualTo("MEMBER1");
+    }
+    //querydsl메소드 사용용
+   @Test
+    public void upper() throws Exception{
+        //when
+        String result = query.select(member.name.upper())
+                .from(member)
+                .where(member.name.eq("member1"))
+                .fetchFirst();
+        //then
+        assertThat(result).isEqualTo("MEMBER1");
     }
 
 }
